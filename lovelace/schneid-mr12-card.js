@@ -720,11 +720,11 @@ class SchneidMr12Card extends HTMLElement {
 
 // ── Custom Element registration ───────────────────────────────────────────────
 
-customElements.define('fernwaerme-mr12-card', SchneidMr12Card);
+customElements.define('schneid-mr12-card', SchneidMr12Card);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type:        'fernwaerme-mr12-card',
+  type:        'schneid-mr12-card',
   name:        'Fernwärme MR-12',
   description: 'Übergabestation Heizkreis 1 + Boilerkreis 1',
 });

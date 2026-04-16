@@ -10,7 +10,7 @@
 # 2. Als Ressource registrieren:
 #      HA → Einstellungen → Dashboards → ⋮ (oben rechts) → Ressourcen
 #      → + Ressource hinzufügen
-#        URL:  /local/fernwaerme-mr12-card.js
+#        URL:  /local/schneid-mr12-card.js
 #        Typ:  JavaScript-Modul
 #
 # 3. HA neu laden (Entwicklerwerkzeuge → YAML neu laden) oder Browser-Cache leeren.
@@ -20,12 +20,12 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # Minimale Konfiguration (alle Defaults)
 # ──────────────────────────────────────────────────────────────────────────────
-type: custom:fernwaerme-mr12-card
+type: custom:schneid-mr12-card
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Vollständige Konfiguration mit allen optionalen Parametern
 # ──────────────────────────────────────────────────────────────────────────────
-# type: custom:fernwaerme-mr12-card
+# type: custom:schneid-mr12-card
 # title: Fernwärme Übergabestation   # Kartenüberschrift (optional)
 # entity_prefix: heating_schneid_mr_12  # Präfix der HA-Entities (optional)
 
@@ -62,5 +62,5 @@ type: custom:fernwaerme-mr12-card
 #   - title: Heizung
 #     path: heizung
 #     cards:
-#       - type: custom:fernwaerme-mr12-card
+#       - type: custom:schneid-mr12-card
 #         title: Fernwärme Übergabestation
