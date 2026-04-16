@@ -35,10 +35,10 @@ Visualisiert die Übergabestation in Echtzeit als SVG-Systemdiagramm:
 ### Manuelle Installation
 
 ```bash
-cp lovelace/fernwaerme-mr12-card.js <ha-config>/www/
+cp lovelace/schneid-mr12-card.js <ha-config>/www/
 ```
 
-HA → Einstellungen → Dashboards → Ressourcen → `/local/fernwaerme-mr12-card.js` (JavaScript-Modul)
+HA → Einstellungen → Dashboards → Ressourcen → `/local/schneid-mr12-card.js` (JavaScript-Modul)
 
 ### Karte einbinden
 

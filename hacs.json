@@ -1,6 +1,6 @@
 {
   "name": "Fernwärme MR-12 Card",
-  "filename": "lovelace/fernwaerme-mr12-card.js",
+  "filename": "lovelace/schneid-mr12-card.js",
   "content_in_root": false,
   "render_readme": true
 }

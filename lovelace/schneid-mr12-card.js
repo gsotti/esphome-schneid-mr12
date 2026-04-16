@@ -8,16 +8,16 @@
  * Installation
  * ────────────
  * 1. Copy this file to your HA configuration www directory:
- *      <ha-config>/www/fernwaerme-mr12-card.js
+ *      <ha-config>/www/schneid-mr12-card.js
  *
  * 2. Register it as a Lovelace resource:
  *      Settings → Dashboards → ⋮ (top-right menu) → Resources
  *      → + Add Resource
- *        URL:  /local/fernwaerme-mr12-card.js
+ *        URL:  /local/schneid-mr12-card.js
  *        Type: JavaScript Module
  *
  * 3. Add the card to a dashboard view (Raw YAML editor or UI):
- *      type: custom:fernwaerme-mr12-card
+ *      type: custom:schneid-mr12-card
  *      entity_prefix: heating_schneid_mr_12   # optional — this is the default
  *      title: Fernwärme Übergabestation        # optional
  *
@@ -29,7 +29,7 @@
  * No external dependencies — pure vanilla JS, Shadow DOM, inline SVG.
  */
 
-class FernwaermeMr12Card extends HTMLElement {
+class SchneidMr12Card extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -720,7 +720,7 @@ class FernwaermeMr12Card extends HTMLElement {
 
 // ── Custom Element registration ───────────────────────────────────────────────
 
-customElements.define('fernwaerme-mr12-card', FernwaermeMr12Card);
+customElements.define('fernwaerme-mr12-card', SchneidMr12Card);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
