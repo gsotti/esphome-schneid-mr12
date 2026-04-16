@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schneid MR-12 Dashboard</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --card: #1f2940;
+    --border: #263238;
+    --text: #e0e0e0;
+    --text2: #90a4ae;
+    --text3: #546e7a;
+    --hot: #e63946;
+    --hot2: #ff6b35;
+    --cold: #48cae4;
+    --cold2: #0077b6;
+    --green: #00e676;
+    --green2: #00c853;
+    --yellow: #ffd54f;
+    --orange: #ff9800;
+    --pink: #f48fb1;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, var(--bg), var(--bg2));
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Login */
+  #login-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,10,20,0.95);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #login-overlay.hidden { display: none; }
+  .login-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-card h2 { font-size: 22px; margin-bottom: 8px; }
+  .login-card p { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+  .login-card label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; margin-top: 12px; }
+  .login-card input {
+    width: 100%; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); font-size: 14px; outline: none;
+  }
+  .login-card input:focus { border-color: var(--cold); }
+  .login-card button {
+    width: 100%; padding: 12px; margin-top: 24px; border-radius: 8px;
+    border: none; background: linear-gradient(135deg, var(--cold2), var(--cold));
+    color: white; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .login-card button:hover { opacity: 0.9; }
+  .login-error { color: var(--hot); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* Header bar */
+  .top-bar {
+    background: #0d1321; padding: 10px 30px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .top-bar .title { display: flex; align-items: center; gap: 10px; }
+  .top-bar .bar { width: 5px; height: 24px; border-radius: 3px; background: linear-gradient(var(--hot), var(--hot2)); }
+  .top-bar h1 { font-size: 18px; font-weight: 700; }
+  .top-bar h1 span { color: var(--text3); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .conn-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text3); }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); }
+  .conn-dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .conn-dot.err { background: var(--hot); box-shadow: 0 0 8px var(--hot); }
+  @keyframes pulse { 0%,100% { opacity: .7; } 50% { opacity: 1; } }
+
+  /* SVG container */
+  .svg-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .svg-wrap svg { max-width: 1200px; width: 100%; height: auto; }
+
+  footer {
+    padding: 10px 30px; text-align: center; font-size: 11px; color: var(--text3);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- Login Overlay -->
+<div id="login-overlay">
+  <div class="login-card">
+    <h2>MR-12 Dashboard</h2>
+    <p>Home Assistant Verbindung konfigurieren</p>
+    <label>Home Assistant URL</label>
+    <input type="text" id="cfg-host" value="https://home.gsottbauer.eu" placeholder="http://homeassistant.local:8123">
+    <label>Long-Lived Access Token</label>
+    <input type="password" id="cfg-token" placeholder="eyJ0eXAiOi...">
+    <button onclick="connect()">Verbinden</button>
+    <div class="login-error" id="login-error">Verbindung fehlgeschlagen</div>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="top-bar">
+  <div class="title">
+    <div class="bar"></div>
+    <h1>Schneid MR-12 <span>Heizungsanlage</span></h1>
+  </div>
+  <div class="conn-status">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span id="conn-label">Nicht verbunden</span>
+    <span style="margin-left:16px;color:#37474f" id="update-time"></span>
+  </div>
+</div>
+
+<!-- SVG System Diagram -->
+<div class="svg-wrap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1f2940"/>
+      <stop offset="100%" style="stop-color:#172033"/>
+    </linearGradient>
+    <linearGradient id="headerBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e63946"/>
+      <stop offset="50%" style="stop-color:#ff6b35"/>
+      <stop offset="100%" style="stop-color:#e63946"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowStrong">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <filter id="innerShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Pump symbols -->
+    <symbol id="pumpOn" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="16" fill="#00c853" stroke="#00e676" stroke-width="2" filter="url(#glow)"/>
+      <path d="M10,18 L18,10 L26,18 L18,26 Z" fill="none" stroke="white" stroke-width="2"/>
+      <circle cx="18" cy="18" r="5" fill="none" stroke="white" stroke-width="1.5"/>
+    </symbol>
+    <symbol id="pumpOff" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="16" fill="#37474f" stroke="#546e7a" stroke-width="2"/>
+      <path d="M10,18 L18,10 L26,18 L18,26 Z" fill="none" stroke="#78909c" stroke-width="2"/>
+      <circle cx="18" cy="18" r="5" fill="none" stroke="#78909c" stroke-width="1.5"/>
+    </symbol>
+
+    <style>
+      @keyframes flowRight { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+      @keyframes flowLeft { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 24; } }
+      @keyframes pulse { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+      .flow-right { animation: flowRight 1s linear infinite; }
+      .flow-left { animation: flowLeft 1s linear infinite; }
+      .pulse { animation: pulse 2s ease-in-out infinite; }
+      .flow-anim { display: none; }
+      .flow-anim.active { display: inline; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="660" fill="url(#bg)" rx="8"/>
+
+  <!-- ==================== OUTSIDE TEMPERATURE ==================== -->
+  <rect x="20" y="20" width="170" height="110" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <text x="105" y="42" text-anchor="middle" font-size="11" fill="#90a4ae" font-weight="bold" letter-spacing="1">AUSSEN</text>
+  <text x="105" y="82" text-anchor="middle" font-size="38" font-weight="bold" fill="#48cae4" filter="url(#glow)" id="svg-outdoor-temp">--°</text>
+  <text x="105" y="102" text-anchor="middle" font-size="11" fill="#546e7a">
+    Mittel <tspan id="svg-outdoor-mean" font-weight="bold">--</tspan>° | Langzeit <tspan id="svg-outdoor-mean-long" font-weight="bold">--</tspan>°
+  </text>
+  <text x="105" y="120" text-anchor="middle" font-size="9" fill="#37474f">T6 (40600)</text>
+
+  <!-- ==================== UEBERGABESTATION ==================== -->
+  <rect x="220" y="20" width="230" height="180" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="220" y="20" width="230" height="28" rx="10" fill="#1b5e20" opacity="0.3" id="svg-ueberg-bg"/>
+  <rect x="220" y="38" width="230" height="10" fill="url(#card)"/>
+  <circle cx="238" cy="34" r="5" id="svg-ueberg-dot" fill="#546e7a"/>
+  <text x="252" y="38" font-size="11" fill="#a5d6a7" font-weight="bold" letter-spacing="1">UEBERGABESTATION</text>
+  <text x="440" y="38" text-anchor="end" font-size="10" font-weight="bold" id="svg-ueberg-text" fill="#78909c">--</text>
+
+  <!-- Heat exchanger icon -->
+  <rect x="255" y="68" width="80" height="55" rx="6" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.5"/>
+  <line x1="265" y1="78" x2="325" y2="78" stroke="#e63946" stroke-width="2" opacity="0.6"/>
+  <line x1="265" y1="88" x2="325" y2="88" stroke="#e63946" stroke-width="2" opacity="0.4"/>
+  <line x1="265" y1="98" x2="325" y2="98" stroke="#48cae4" stroke-width="2" opacity="0.4"/>
+  <line x1="265" y1="108" x2="325" y2="108" stroke="#48cae4" stroke-width="2" opacity="0.6"/>
+  <text x="295" y="118" text-anchor="middle" font-size="9" fill="#78909c">WT</text>
+
+  <!-- RL Primaer -->
+  <text x="385" y="66" text-anchor="middle" font-size="8" fill="#78909c">RL Primaer (T7)</text>
+  <rect x="355" y="70" width="68" height="22" rx="5" fill="#0077b6" filter="url(#innerShadow)"/>
+  <text x="389" y="86" text-anchor="middle" font-size="13" font-weight="bold" fill="white" id="svg-return-primary">--°</text>
+
+  <!-- VL Sekundaer -->
+  <text x="385" y="106" text-anchor="middle" font-size="8" fill="#78909c">VL Sekundaer (T8)</text>
+  <rect x="355" y="110" width="68" height="22" rx="5" fill="#e63946" filter="url(#innerShadow)"/>
+  <text x="389" y="126" text-anchor="middle" font-size="13" font-weight="bold" fill="white" id="svg-flow-secondary">--°</text>
+  <text x="389" y="145" text-anchor="middle" font-size="8" fill="#546e7a">
+    Soll: <tspan id="svg-soll-vl-sek">--</tspan>° | Max RL: <tspan id="svg-max-rl-pri">--</tspan>°
+  </text>
+
+  <!-- Valve -->
+  <rect x="255" y="150" width="70" height="36" rx="5" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="290" y="164" text-anchor="middle" font-size="8" fill="#78909c">Ventil</text>
+  <text x="290" y="180" text-anchor="middle" font-size="15" font-weight="bold" fill="#ff6b35" id="svg-valve">--%</text>
+
+  <!-- ==================== DISTRIBUTION PIPES ==================== -->
+  <!-- Vorlauf vertical (hot) -->
+  <line x1="485" y1="140" x2="485" y2="580" stroke="#e63946" stroke-width="5" opacity="0.8"/>
+  <line x1="485" y1="140" x2="485" y2="580" stroke="#ff6b35" stroke-width="3" stroke-dasharray="12,12" class="flow-right" opacity="0.5"/>
+  <!-- Ruecklauf vertical (cold) -->
+  <line x1="530" y1="140" x2="530" y2="580" stroke="#0077b6" stroke-width="5" opacity="0.8"/>
+  <line x1="530" y1="140" x2="530" y2="580" stroke="#48cae4" stroke-width="3" stroke-dasharray="12,12" class="flow-left" opacity="0.5"/>
+  <!-- Pipe labels -->
+  <text x="485" y="135" text-anchor="middle" font-size="8" fill="#e63946" font-weight="bold">VL</text>
+  <text x="530" y="135" text-anchor="middle" font-size="8" fill="#48cae4" font-weight="bold">RL</text>
+
+  <!-- ==================== HEIZKREIS 0 ==================== -->
+  <rect x="575" y="20" width="600" height="105" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="575" y="20" width="600" height="28" rx="10" id="svg-hk0-headbg" fill="#37474f" opacity="0.3"/>
+  <rect x="575" y="38" width="600" height="10" fill="url(#card)"/>
+  <circle cx="593" cy="34" r="5" id="svg-hk0-dot" fill="#546e7a"/>
+  <text x="607" y="38" font-size="12" fill="#90a4ae" font-weight="bold" letter-spacing="1">HEIZKREIS 0</text>
+  <text x="750" y="38" font-size="10" fill="#546e7a" id="svg-hk0-mode">--</text>
+  <rect x="1110" y="25" width="55" height="18" rx="4" id="svg-hk0-badgebg" fill="#37474f"/>
+  <text x="1138" y="38" text-anchor="middle" font-size="9" font-weight="bold" id="svg-hk0-badge" fill="#78909c">--</text>
+
+  <!-- Pipes HK0 -->
+  <line x1="485" y1="74" x2="630" y2="74" stroke="#e63946" stroke-width="3" opacity="0.4" id="svg-hk0-vl-pipe"/>
+  <line x1="485" y1="74" x2="630" y2="74" stroke="#ff6b35" stroke-width="2" stroke-dasharray="8,8" class="flow-anim flow-right" id="svg-hk0-vl-anim" opacity="0.6"/>
+  <line x1="630" y1="100" x2="530" y2="100" stroke="#0077b6" stroke-width="3" opacity="0.4" id="svg-hk0-rl-pipe"/>
+  <line x1="630" y1="100" x2="530" y2="100" stroke="#48cae4" stroke-width="2" stroke-dasharray="8,8" class="flow-anim flow-left" id="svg-hk0-rl-anim" opacity="0.6"/>
+
+  <!-- Mixer HK0 -->
+  <rect x="638" y="62" width="65" height="28" rx="6" fill="#263238" stroke="#546e7a" stroke-width="1" id="svg-hk0-mixer-box"/>
+  <text x="670" y="74" text-anchor="middle" font-size="8" fill="#78909c">MISCHER</text>
+  <text x="670" y="86" text-anchor="middle" font-size="10" font-weight="bold" id="svg-hk0-mixer" fill="#78909c">--</text>
+
+  <!-- Pump HK0 -->
+  <use href="#pumpOff" x="730" y="60" width="28" height="28" id="svg-hk0-pump-icon"/>
+  <text x="744" y="98" text-anchor="middle" font-size="8" id="svg-hk0-pump-text" fill="#546e7a">--</text>
+
+  <!-- VL Temp HK0 -->
+  <rect x="800" y="62" width="80" height="30" rx="6" fill="#263238" stroke="#546e7a" stroke-width="1" id="svg-hk0-vl-box"/>
+  <text x="840" y="74" text-anchor="middle" font-size="8" fill="#78909c">VORLAUF</text>
+  <text x="840" y="88" text-anchor="middle" font-size="14" font-weight="bold" id="svg-hk0-vl" fill="#78909c">--°</text>
+
+  <!-- Soll HK0 -->
+  <rect x="900" y="62" width="80" height="30" rx="6" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="940" y="74" text-anchor="middle" font-size="8" fill="#546e7a">SOLL</text>
+  <text x="940" y="88" text-anchor="middle" font-size="14" font-weight="bold" id="svg-hk0-soll" fill="#546e7a">--°</text>
+
+  <!-- Status HK0 -->
+  <rect x="1000" y="62" width="80" height="30" rx="6" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="1040" y="74" text-anchor="middle" font-size="8" fill="#546e7a">STATUS</text>
+  <text x="1040" y="87" text-anchor="middle" font-size="10" font-weight="bold" id="svg-hk0-status" fill="#546e7a">--</text>
+
+  <!-- ==================== HEIZKREIS 1 ==================== -->
+  <rect x="575" y="140" width="600" height="105" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="575" y="140" width="600" height="28" rx="10" id="svg-hk1-headbg" fill="#37474f" opacity="0.3"/>
+  <rect x="575" y="158" width="600" height="10" fill="url(#card)"/>
+  <circle cx="593" cy="154" r="5" id="svg-hk1-dot" fill="#546e7a"/>
+  <text x="607" y="158" font-size="12" fill="#90a4ae" font-weight="bold" letter-spacing="1">HEIZKREIS 1</text>
+  <text x="750" y="158" font-size="10" fill="#546e7a" id="svg-hk1-mode">--</text>
+  <rect x="1110" y="145" width="55" height="18" rx="4" id="svg-hk1-badgebg" fill="#37474f"/>
+  <text x="1138" y="158" text-anchor="middle" font-size="9" font-weight="bold" id="svg-hk1-badge" fill="#78909c">--</text>
+
+  <!-- Pipes HK1 -->
+  <line x1="485" y1="194" x2="630" y2="194" stroke="#e63946" stroke-width="3" opacity="0.4" id="svg-hk1-vl-pipe"/>
+  <line x1="485" y1="194" x2="630" y2="194" stroke="#ff6b35" stroke-width="2" stroke-dasharray="8,8" class="flow-anim flow-right" id="svg-hk1-vl-anim" opacity="0.6"/>
+  <line x1="630" y1="220" x2="530" y2="220" stroke="#0077b6" stroke-width="3" opacity="0.4" id="svg-hk1-rl-pipe"/>
+  <line x1="630" y1="220" x2="530" y2="220" stroke="#48cae4" stroke-width="2" stroke-dasharray="8,8" class="flow-anim flow-left" id="svg-hk1-rl-anim" opacity="0.6"/>
+
+  <!-- Mixer HK1 -->
+  <rect x="638" y="182" width="65" height="28" rx="6" fill="#263238" stroke="#546e7a" stroke-width="1" id="svg-hk1-mixer-box"/>
+  <text x="670" y="194" text-anchor="middle" font-size="8" fill="#78909c">MISCHER</text>
+  <text x="670" y="206" text-anchor="middle" font-size="10" font-weight="bold" id="svg-hk1-mixer" fill="#78909c">--</text>
+
+  <!-- Pump HK1 -->
+  <use href="#pumpOff" x="730" y="180" width="28" height="28" id="svg-hk1-pump-icon"/>
+  <text x="744" y="218" text-anchor="middle" font-size="8" id="svg-hk1-pump-text" fill="#546e7a">--</text>
+
+  <!-- VL Temp HK1 -->
+  <rect x="800" y="182" width="80" height="30" rx="6" fill="#263238" stroke="#546e7a" stroke-width="1" id="svg-hk1-vl-box"/>
+  <text x="840" y="194" text-anchor="middle" font-size="8" fill="#78909c">VORLAUF</text>
+  <text x="840" y="208" text-anchor="middle" font-size="14" font-weight="bold" id="svg-hk1-vl" fill="#78909c">--°</text>
+
+  <!-- Soll HK1 -->
+  <rect x="900" y="182" width="80" height="30" rx="6" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="940" y="194" text-anchor="middle" font-size="8" fill="#546e7a">SOLL</text>
+  <text x="940" y="208" text-anchor="middle" font-size="14" font-weight="bold" id="svg-hk1-soll" fill="#546e7a">--°</text>
+
+  <!-- Delta HK1 -->
+  <rect x="1000" y="182" width="60" height="30" rx="6" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="1030" y="194" text-anchor="middle" font-size="8" fill="#78909c">DELTA</text>
+  <text x="1030" y="208" text-anchor="middle" font-size="13" font-weight="bold" id="svg-hk1-delta" fill="#78909c">--</text>
+
+  <!-- Status HK1 -->
+  <rect x="1080" y="182" width="80" height="30" rx="6" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="1120" y="194" text-anchor="middle" font-size="8" fill="#546e7a">STATUS</text>
+  <text x="1120" y="207" text-anchor="middle" font-size="10" font-weight="bold" id="svg-hk1-status" fill="#546e7a">--</text>
+
+  <!-- ==================== HEIZKREIS 2 ==================== -->
+  <rect x="575" y="260" width="600" height="105" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="575" y="260" width="600" height="28" rx="10" fill="#e65100" opacity="0.15"/>
+  <rect x="575" y="278" width="600" height="10" fill="url(#card)"/>
+  <circle cx="593" cy="274" r="5" id="svg-hk2-dot" fill="#ff9800" class="pulse"/>
+  <text x="607" y="278" font-size="12" fill="#ffcc80" font-weight="bold" letter-spacing="1">HEIZKREIS 2</text>
+  <rect x="1110" y="265" width="55" height="18" rx="4" id="svg-hk2-badgebg" fill="#4e342e"/>
+  <text x="1138" y="278" text-anchor="middle" font-size="9" font-weight="bold" id="svg-hk2-badge" fill="#ffab91">--</text>
+
+  <!-- Pipes HK2 -->
+  <line x1="485" y1="314" x2="630" y2="314" stroke="#e63946" stroke-width="3" opacity="0.8"/>
+  <line x1="485" y1="314" x2="630" y2="314" stroke="#ff6b35" stroke-width="2" stroke-dasharray="8,8" class="flow-right" opacity="0.6"/>
+  <line x1="630" y1="340" x2="530" y2="340" stroke="#0077b6" stroke-width="3" opacity="0.4"/>
+
+  <!-- VL Temp HK2 -->
+  <rect x="800" y="302" width="80" height="30" rx="6" fill="#3e2723" stroke="#5d4037" stroke-width="1"/>
+  <text x="840" y="314" text-anchor="middle" font-size="8" fill="#bcaaa4">VORLAUF</text>
+  <text x="840" y="328" text-anchor="middle" font-size="14" font-weight="bold" id="svg-hk2-vl" fill="#ffcc80">--°</text>
+
+  <!-- Soll HK2 -->
+  <rect x="900" y="302" width="80" height="30" rx="6" fill="#3e2723" stroke="#4e342e" stroke-width="1"/>
+  <text x="940" y="314" text-anchor="middle" font-size="8" fill="#a1887f">SOLL</text>
+  <text x="940" y="328" text-anchor="middle" font-size="14" font-weight="bold" id="svg-hk2-soll" fill="#d7ccc8">--°</text>
+
+  <!-- Delta HK2 -->
+  <rect x="1000" y="302" width="60" height="30" rx="6" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="1030" y="314" text-anchor="middle" font-size="8" fill="#78909c">DELTA</text>
+  <text x="1030" y="328" text-anchor="middle" font-size="13" font-weight="bold" id="svg-hk2-delta" fill="#78909c">--</text>
+
+  <!-- ==================== SPEICHER 1 ==================== -->
+  <rect x="575" y="385" width="280" height="130" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="575" y="385" width="280" height="28" rx="10" fill="#880e4f" opacity="0.2"/>
+  <rect x="575" y="403" width="280" height="10" fill="url(#card)"/>
+  <circle cx="593" cy="399" r="5" id="svg-boiler-dot" fill="#546e7a"/>
+  <text x="607" y="403" font-size="12" fill="#f48fb1" font-weight="bold" letter-spacing="1">SPEICHER 1</text>
+  <rect x="790" y="390" width="50" height="18" rx="4" id="svg-boiler-badgebg" fill="#37474f"/>
+  <text x="815" y="403" text-anchor="middle" font-size="9" font-weight="bold" id="svg-boiler-badge" fill="#78909c">--</text>
+
+  <!-- Pipes Speicher -->
+  <line x1="485" y1="435" x2="610" y2="435" stroke="#e63946" stroke-width="3" opacity="0.4"/>
+  <line x1="610" y1="485" x2="530" y2="485" stroke="#0077b6" stroke-width="3" opacity="0.4"/>
+
+  <!-- Pump Boiler -->
+  <use href="#pumpOff" x="615" y="420" width="26" height="26" id="svg-boiler-pump-icon"/>
+  <text x="628" y="456" text-anchor="middle" font-size="8" id="svg-boiler-pump-text" fill="#546e7a">--</text>
+
+  <!-- Tank visualization -->
+  <rect x="670" y="420" width="55" height="80" rx="8" fill="#263238" stroke="#546e7a" stroke-width="1.5"/>
+  <rect x="674" y="424" width="47" height="25" rx="4" fill="#e63946" opacity="0.3"/>
+  <rect x="674" y="452" width="47" height="25" rx="4" fill="#0077b6" opacity="0.2"/>
+  <rect x="674" y="480" width="47" height="16" rx="4" fill="#0d47a1" opacity="0.15"/>
+
+  <!-- T9 oben -->
+  <rect x="740" y="420" width="80" height="26" rx="5" fill="#4a1428" stroke="#880e4f" stroke-width="1"/>
+  <text x="780" y="430" text-anchor="middle" font-size="8" fill="#f48fb1">T9 OBEN</text>
+  <text x="780" y="443" text-anchor="middle" font-size="13" font-weight="bold" fill="#f8bbd0" id="svg-buffer1-top">--°</text>
+
+  <!-- Boiler Soll -->
+  <rect x="740" y="460" width="80" height="26" rx="5" fill="#263238" stroke="#37474f" stroke-width="1"/>
+  <text x="780" y="470" text-anchor="middle" font-size="8" fill="#78909c">SOLL BOILER</text>
+  <text x="780" y="483" text-anchor="middle" font-size="13" font-weight="bold" fill="#b0bec5" id="svg-boiler-soll">--°</text>
+
+  <!-- VL Boiler 1 Soll -->
+  <rect x="740" y="494" width="80" height="18" rx="4" fill="#263238" stroke="#37474f" stroke-width="0.5"/>
+  <text x="780" y="507" text-anchor="middle" font-size="9" fill="#546e7a">VL Soll: <tspan id="svg-setpoint-boiler1">--</tspan>°</text>
+
+  <!-- ==================== SOLAR ==================== -->
+  <rect x="20" y="160" width="170" height="140" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="20" y="160" width="170" height="28" rx="10" fill="#f57f17" opacity="0.15"/>
+  <rect x="20" y="178" width="170" height="10" fill="url(#card)"/>
+  <circle cx="38" cy="174" r="6" fill="#ffd54f" opacity="0.3"/>
+  <circle cx="38" cy="174" r="4" fill="#ffd54f" opacity="0.5"/>
+  <text x="52" y="178" font-size="11" fill="#ffd54f" font-weight="bold" letter-spacing="1">SOLAR</text>
+
+  <g transform="translate(105, 208)">
+    <text x="0" y="0" text-anchor="middle" font-size="9" fill="#78909c">Solarpumpe</text>
+    <text x="0" y="18" text-anchor="middle" font-size="18" font-weight="bold" id="svg-solar-pump" fill="#546e7a">--%</text>
+  </g>
+  <g transform="translate(105, 250)">
+    <text x="0" y="0" text-anchor="middle" font-size="9" fill="#78909c">Pufferpumpe</text>
+    <text x="0" y="18" text-anchor="middle" font-size="18" font-weight="bold" id="svg-buffer-pump" fill="#546e7a">--%</text>
+  </g>
+  <g transform="translate(105, 285)">
+    <text x="0" y="0" text-anchor="middle" font-size="9" fill="#78909c">Zubringpumpe: <tspan id="svg-feed-pump">--</tspan></text>
+  </g>
+
+  <!-- ==================== BETRIEBSMODI ==================== -->
+  <rect x="20" y="330" width="170" height="100" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <text x="105" y="352" text-anchor="middle" font-size="11" fill="#90a4ae" font-weight="bold" letter-spacing="1">BETRIEBSMODI</text>
+  <text x="38" y="375" font-size="10" fill="#78909c">HK0:</text>
+  <text x="75" y="375" font-size="10" fill="#b0bec5" font-weight="bold" id="svg-mode-hk0">--</text>
+  <text x="38" y="393" font-size="10" fill="#78909c">HK1:</text>
+  <text x="75" y="393" font-size="10" fill="#b0bec5" font-weight="bold" id="svg-mode-hk1">--</text>
+  <text x="38" y="411" font-size="10" fill="#78909c">Boiler:</text>
+  <text x="85" y="411" font-size="10" fill="#b0bec5" font-weight="bold" id="svg-boiler-setpoint-text">--°</text>
+
+  <!-- ==================== SYSTEM STATUS BAR ==================== -->
+  <rect x="20" y="540" width="1155" height="55" rx="10" fill="url(#card)" filter="url(#shadow)" stroke="#263238" stroke-width="1"/>
+  <rect x="40" y="552" width="32" height="32" rx="4" fill="#263238" stroke="#4caf50" stroke-width="1"/>
+  <text x="56" y="565" text-anchor="middle" font-size="7" fill="#4caf50">ESP32</text>
+  <text x="56" y="576" text-anchor="middle" font-size="6" fill="#4caf50">C3</text>
+
+  <text x="85" y="560" font-size="11" fill="#b0bec5" font-weight="bold">schneid-mr12</text>
+  <text x="85" y="576" font-size="9" fill="#546e7a">GPIO4=TX | GPIO3=RX | GPIO2=DE/RE | MAX485 | 19200 Baud</text>
+  <text x="85" y="590" font-size="8" fill="#37474f" id="svg-esphome-ver"></text>
+
+  <circle cx="680" cy="560" r="5" fill="#4caf50" class="pulse"/>
+  <text x="692" y="564" font-size="10" fill="#81c784">Modbus OK</text>
+  <circle cx="680" cy="580" r="5" fill="#4caf50" class="pulse"/>
+  <text x="692" y="584" font-size="10" fill="#81c784">WiFi <tspan id="svg-wifi">--</tspan> dBm</text>
+
+  <text x="870" y="560" font-size="9" fill="#546e7a">FW: <tspan id="svg-firmware">--</tspan></text>
+  <text x="870" y="576" font-size="9" fill="#546e7a">Uptime: <tspan id="svg-uptime">--</tspan></text>
+
+  <!-- Pipe labels -->
+  <rect x="460" y="610" width="60" height="18" rx="4" fill="#1a1a2e" stroke="#e63946" stroke-width="1" opacity="0.8"/>
+  <text x="490" y="622" text-anchor="middle" font-size="8" fill="#e63946">VORLAUF</text>
+  <rect x="460" y="632" width="70" height="18" rx="4" fill="#1a1a2e" stroke="#48cae4" stroke-width="1" opacity="0.8"/>
+  <text x="495" y="644" text-anchor="middle" font-size="8" fill="#48cae4">RUECKLAUF</text>
+</svg>
+</div>
+
+<footer>
+  Schneid MR-12 | Home Assistant WebSocket API | ESP32-C3 | Modbus RTU | MAX485 | 19200 Baud
+</footer>
+
+<script>
+// ---- State store ----
+const state = {};
+let ws = null;
+let haUrl = '';
+let haToken = '';
+let msgId = 1;
+
+const DEVICE = 'heating_schneid_mr_12_';
+const sensorMap = {
+  ['sensor.' + DEVICE + 'aussentemperatur']: 'outdoor_temp',
+  ['sensor.' + DEVICE + 'aussentemperatur_mittel']: 'outdoor_temp_mean',
+  ['sensor.' + DEVICE + 'aussentemperatur_mittel_langzeit']: 'outdoor_temp_mean_long',
+  ['sensor.' + DEVICE + 'rl_primar_t7']: 'return_primary',
+  ['sensor.' + DEVICE + 'vl_sekundar_t8']: 'flow_secondary',
+  ['sensor.' + DEVICE + 'solltemperatur_vl_sekundar']: 'setpoint_flow_secondary',
+  ['sensor.' + DEVICE + 'max_rucklauftemperatur_primar']: 'max_return_primary',
+  ['sensor.' + DEVICE + 'status_ubergabestation']: 'status_uebergabe',
+  ['sensor.' + DEVICE + 'vl_heizkreis_0']: 'flow_hk0',
+  ['sensor.' + DEVICE + 'solltemperatur_heizkreis_0']: 'setpoint_hk0',
+  ['sensor.' + DEVICE + 'status_heizkreis_0']: 'status_hk0',
+  ['sensor.' + DEVICE + 'status_mischer_heizkreis_0']: 'mixer_hk0',
+  ['sensor.' + DEVICE + 'vl_heizkreis_1']: 'flow_hk1',
+  ['sensor.' + DEVICE + 'solltemperatur_heizkreis_1']: 'setpoint_hk1',
+  ['sensor.' + DEVICE + 'status_heizkreis_1']: 'status_hk1',
+  ['sensor.' + DEVICE + 'status_mischer_heizkreis_1']: 'mixer_hk1',
+  ['sensor.' + DEVICE + 'vl_heizkreis_2']: 'flow_hk2',
+  ['sensor.' + DEVICE + 'solltemperatur_heizkreis_2']: 'setpoint_hk2',
+  ['sensor.' + DEVICE + 'speicher_1_oben_t9']: 'buffer1_top',
+  ['sensor.' + DEVICE + 'solltemperatur_vl_boiler_1']: 'setpoint_boiler1',
+  ['sensor.' + DEVICE + 'status_boilerkreis_1']: 'status_boiler1',
+  ['sensor.' + DEVICE + 'drehzahl_pufferpumpe']: 'speed_buffer_pump',
+  ['sensor.' + DEVICE + 'drehzahl_solarpumpe']: 'speed_solar_pump',
+  ['sensor.' + DEVICE + 'ventilstellung']: 'valve_position',
+  ['sensor.' + DEVICE + 'firmware_version']: 'firmware_version',
+  ['sensor.' + DEVICE + 'wifi_signal']: 'wifi_signal',
+  ['sensor.' + DEVICE + 'uptime']: 'uptime',
+  ['binary_sensor.' + DEVICE + 'pumpe_heizkreis_0']: 'pump_hk0',
+  ['binary_sensor.' + DEVICE + 'pumpe_heizkreis_1']: 'pump_hk1',
+  ['binary_sensor.' + DEVICE + 'pumpe_boiler_1']: 'pump_boiler1',
+  ['binary_sensor.' + DEVICE + 'zubringpumpe']: 'feed_pump',
+  ['number.' + DEVICE + 'betriebsmodus_heizkreis_0']: 'mode_hk0',
+  ['number.' + DEVICE + 'betriebsmodus_heizkreis_1']: 'mode_hk1',
+  ['number.' + DEVICE + 'boiler_solltemperatur']: 'boiler_setpoint',
+  ['sensor.' + DEVICE + 'esphome_version']: 'esphome_version',
+};
+
+const mixerNames = { 0: 'Steht', 1: 'AUF', 2: 'ZU' };
+const modeNames = { 0: 'AUS/Frost', 1: 'Absenk', 2: 'Heizen', 3: 'Zeitprog.', 4: 'Party', 5: 'Wahlsch.' };
+const statusNames = { 0: 'P.AUS/M.Steht', 1: 'P.EIN/M.Steht', 2: 'P.EIN/M.AUF', 3: 'P.EIN/M.ZU', 4: 'P.AUS/M.AUF', 5: 'P.AUS/M.ZU', 6: 'FB Auto', 7: 'FB TAG', 8: 'FB NACHT', 9: 'Automatik', 10: 'FB AUS/FS' };
+const uebergabeNames = { 0: 'AUS', 1: 'EIN', 3: 'RL-Begr.', 4: 'Hand' };
+const boilerStatusNames = { 0: 'AUS', 1: 'EIN', 9: 'Auto' };
+
+// ---- Connect ----
+function connect() {
+  const host = document.getElementById('cfg-host').value.trim().replace(/\/+$/, '');
+  const token = document.getElementById('cfg-token').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!host || !token) { errEl.textContent = 'URL und Token sind erforderlich'; errEl.style.display = 'block'; return; }
+  haUrl = host; haToken = token;
+  try { localStorage.setItem('mr12-host', host); localStorage.setItem('mr12-token', token); } catch(e) {}
+  document.getElementById('login-overlay').classList.add('hidden');
+  startWebSocket();
+}
+
+function startWebSocket() {
+  if (ws) { ws.close(); ws = null; }
+  msgId = 1;
+  const wsUrl = haUrl.replace(/^http/, 'ws') + '/api/websocket';
+  setConnStatus('connecting', 'Verbinde...');
+  ws = new WebSocket(wsUrl);
+  ws.onmessage = (evt) => {
+    const msg = JSON.parse(evt.data);
+    if (msg.type === 'auth_required') {
+      ws.send(JSON.stringify({ type: 'auth', access_token: haToken }));
+    } else if (msg.type === 'auth_ok') {
+      setConnStatus('ok', haUrl.replace(/^https?:\/\//, ''));
+      ws.send(JSON.stringify({ id: msgId++, type: 'get_states' }));
+      ws.send(JSON.stringify({ id: msgId++, type: 'subscribe_events', event_type: 'state_changed' }));
+    } else if (msg.type === 'auth_invalid') {
+      setConnStatus('err', 'Auth fehlgeschlagen');
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('login-error').textContent = 'Ungültiger Token';
+      document.getElementById('login-error').style.display = 'block';
+    } else if (msg.type === 'result' && msg.success && Array.isArray(msg.result)) {
+      for (const s of msg.result) { const key = sensorMap[s.entity_id]; if (key) handleHaState(key, s.state); }
+      updateDerived();
+      document.getElementById('update-time').textContent = new Date().toLocaleTimeString();
+    } else if (msg.type === 'event' && msg.event?.event_type === 'state_changed') {
+      const d = msg.event.data;
+      const key = sensorMap[d.entity_id];
+      if (key && d.new_state) { handleHaState(key, d.new_state.state); updateDerived(); document.getElementById('update-time').textContent = new Date().toLocaleTimeString(); }
+    }
+  };
+  ws.onclose = () => { setConnStatus('err', 'Unterbrochen...'); setTimeout(startWebSocket, 3000); };
+  ws.onerror = () => {};
+}
+
+function handleHaState(key, stateStr) {
+  if (stateStr === 'unavailable' || stateStr === 'unknown') return;
+  let value;
+  if (key === 'pump_hk0' || key === 'pump_hk1' || key === 'pump_boiler1' || key === 'feed_pump') {
+    value = stateStr === 'on';
+  } else {
+    const num = parseFloat(stateStr);
+    value = isNaN(num) ? stateStr : num;
+  }
+  state[key] = value;
+  updateSvg(key, value, stateStr);
+}
+
+function setConnStatus(status, label) {
+  document.getElementById('conn-dot').className = 'conn-dot ' + (status === 'ok' ? 'ok' : 'err');
+  document.getElementById('conn-label').textContent = label;
+}
+
+// ---- SVG update logic ----
+function fmt(v) { return typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(1)) : v; }
+
+function updateSvg(key, value, stateStr) {
+  const svgEl = (id) => document.getElementById(id);
+
+  switch (key) {
+    case 'outdoor_temp': svgEl('svg-outdoor-temp').textContent = fmt(value) + '°'; break;
+    case 'outdoor_temp_mean': svgEl('svg-outdoor-mean').textContent = fmt(value); break;
+    case 'outdoor_temp_mean_long': svgEl('svg-outdoor-mean-long').textContent = fmt(value); break;
+    case 'return_primary': svgEl('svg-return-primary').textContent = fmt(value) + '°'; break;
+    case 'flow_secondary': svgEl('svg-flow-secondary').textContent = fmt(value) + '°'; break;
+    case 'setpoint_flow_secondary': svgEl('svg-soll-vl-sek').textContent = fmt(value); break;
+    case 'max_return_primary': svgEl('svg-max-rl-pri').textContent = fmt(value); break;
+    case 'valve_position': svgEl('svg-valve').textContent = fmt(value) + '%'; break;
+
+    case 'status_uebergabe': {
+      const name = uebergabeNames[value] || value;
+      svgEl('svg-ueberg-text').textContent = name;
+      const on = value === 1;
+      svgEl('svg-ueberg-dot').setAttribute('fill', on ? '#00e676' : '#546e7a');
+      if (on) svgEl('svg-ueberg-dot').classList.add('pulse'); else svgEl('svg-ueberg-dot').classList.remove('pulse');
+      svgEl('svg-ueberg-bg').setAttribute('fill', on ? '#1b5e20' : '#37474f');
+      break;
+    }
+
+    // HK0
+    case 'flow_hk0': svgEl('svg-hk0-vl').textContent = fmt(value) + '°'; break;
+    case 'setpoint_hk0': svgEl('svg-hk0-soll').textContent = fmt(value) + '°'; break;
+    case 'mixer_hk0': svgEl('svg-hk0-mixer').textContent = mixerNames[value] || value; break;
+    case 'status_hk0': svgEl('svg-hk0-status').textContent = statusNames[value] || value; break;
+    case 'pump_hk0': updateSvgPump('hk0', value); break;
+    case 'mode_hk0': svgEl('svg-hk0-mode').textContent = modeNames[value] || value; svgEl('svg-mode-hk0').textContent = (value !== undefined ? value + ' ' : '') + (modeNames[value] || ''); break;
+
+    // HK1
+    case 'flow_hk1': svgEl('svg-hk1-vl').textContent = fmt(value) + '°'; break;
+    case 'setpoint_hk1': svgEl('svg-hk1-soll').textContent = fmt(value) + '°'; break;
+    case 'mixer_hk1': svgEl('svg-hk1-mixer').textContent = mixerNames[value] || value; break;
+    case 'status_hk1': svgEl('svg-hk1-status').textContent = statusNames[value] || value; break;
+    case 'pump_hk1': updateSvgPump('hk1', value); break;
+    case 'mode_hk1': svgEl('svg-hk1-mode').textContent = modeNames[value] || value; svgEl('svg-mode-hk1').textContent = (value !== undefined ? value + ' ' : '') + (modeNames[value] || ''); break;
+
+    // HK2
+    case 'flow_hk2': svgEl('svg-hk2-vl').textContent = fmt(value) + '°'; break;
+    case 'setpoint_hk2': svgEl('svg-hk2-soll').textContent = fmt(value) + '°'; break;
+
+    // Speicher
+    case 'buffer1_top': svgEl('svg-buffer1-top').textContent = fmt(value) + '°'; break;
+    case 'setpoint_boiler1': svgEl('svg-setpoint-boiler1').textContent = fmt(value); break;
+    case 'status_boiler1': {
+      const name = boilerStatusNames[value] || value;
+      svgEl('svg-boiler-badge').textContent = name;
+      const on = value === 1;
+      svgEl('svg-boiler-badgebg').setAttribute('fill', on ? '#880e4f' : '#37474f');
+      svgEl('svg-boiler-badge').setAttribute('fill', on ? '#f48fb1' : '#78909c');
+      break;
+    }
+    case 'pump_boiler1': {
+      svgEl('svg-boiler-pump-icon').setAttribute('href', value ? '#pumpOn' : '#pumpOff');
+      svgEl('svg-boiler-pump-text').textContent = value ? 'ON' : 'OFF';
+      svgEl('svg-boiler-pump-text').setAttribute('fill', value ? '#00e676' : '#546e7a');
+      break;
+    }
+    case 'boiler_setpoint': svgEl('svg-boiler-soll').textContent = fmt(value) + '°'; svgEl('svg-boiler-setpoint-text').textContent = fmt(value) + '°'; break;
+
+    // Solar / pumps
+    case 'speed_solar_pump': svgEl('svg-solar-pump').textContent = fmt(value) + '%'; svgEl('svg-solar-pump').setAttribute('fill', value > 0 ? '#ffd54f' : '#546e7a'); break;
+    case 'speed_buffer_pump': svgEl('svg-buffer-pump').textContent = fmt(value) + '%'; svgEl('svg-buffer-pump').setAttribute('fill', value > 0 ? '#ffd54f' : '#546e7a'); break;
+    case 'feed_pump': svgEl('svg-feed-pump').textContent = value ? 'EIN' : 'AUS'; break;
+
+    // System
+    case 'wifi_signal': svgEl('svg-wifi').textContent = fmt(value); break;
+    case 'firmware_version': svgEl('svg-firmware').textContent = fmt(value); break;
+    case 'uptime': svgEl('svg-uptime').textContent = formatUptime(value); break;
+    case 'esphome_version': svgEl('svg-esphome-ver').textContent = stateStr; break;
+  }
+}
+
+function updateSvgPump(hk, on) {
+  const icon = document.getElementById('svg-' + hk + '-pump-icon');
+  const text = document.getElementById('svg-' + hk + '-pump-text');
+  if (icon) icon.setAttribute('href', on ? '#pumpOn' : '#pumpOff');
+  if (text) { text.textContent = on ? 'ON' : 'OFF'; text.setAttribute('fill', on ? '#00e676' : '#546e7a'); }
+  // Activate pipe flow animations
+  const vlAnim = document.getElementById('svg-' + hk + '-vl-anim');
+  const rlAnim = document.getElementById('svg-' + hk + '-rl-anim');
+  if (vlAnim) vlAnim.classList.toggle('active', !!on);
+  if (rlAnim) rlAnim.classList.toggle('active', !!on);
+  // Pipe opacity
+  const vlPipe = document.getElementById('svg-' + hk + '-vl-pipe');
+  const rlPipe = document.getElementById('svg-' + hk + '-rl-pipe');
+  if (vlPipe) vlPipe.setAttribute('opacity', on ? '0.8' : '0.4');
+  if (rlPipe) rlPipe.setAttribute('opacity', on ? '0.8' : '0.4');
+}
+
+function updateDerived() {
+  // HK active states
+  [0, 1, 2].forEach(n => {
+    const hk = 'hk' + n;
+    const on = state['pump_' + hk] === true || (state['status_' + hk] >= 1 && state['status_' + hk] <= 3);
+    const dot = document.getElementById('svg-' + hk + '-dot');
+    const badge = document.getElementById('svg-' + hk + '-badge');
+    const badgebg = document.getElementById('svg-' + hk + '-badgebg');
+    const headbg = document.getElementById('svg-' + hk + '-headbg');
+
+    if (dot) { dot.setAttribute('fill', on ? '#00e676' : '#546e7a'); if (on) dot.classList.add('pulse'); else dot.classList.remove('pulse'); }
+    if (badge) { badge.textContent = on ? 'AKTIV' : 'INAKTIV'; badge.setAttribute('fill', on ? '#69f0ae' : '#78909c'); }
+    if (badgebg) badgebg.setAttribute('fill', on ? '#1b5e20' : '#37474f');
+    if (headbg) { headbg.setAttribute('fill', on ? '#1b5e20' : '#37474f'); headbg.setAttribute('opacity', on ? '0.3' : '0.3'); }
+
+    // Color the VL box
+    const vlBox = document.getElementById('svg-' + hk + '-vl-box');
+    const vlText = document.getElementById('svg-' + hk + '-vl');
+    if (vlBox) vlBox.setAttribute('stroke', on ? '#2e7d32' : '#546e7a');
+    if (vlText) vlText.setAttribute('fill', on ? '#69f0ae' : '#78909c');
+
+    // Mixer box color
+    const mixerBox = document.getElementById('svg-' + hk + '-mixer-box');
+    if (mixerBox) mixerBox.setAttribute('stroke', on ? '#2e7d32' : '#546e7a');
+  });
+
+  // Deltas
+  calcSvgDelta('flow_hk1', 'setpoint_hk1', 'svg-hk1-delta');
+  calcSvgDelta('flow_hk2', 'setpoint_hk2', 'svg-hk2-delta');
+}
+
+function calcSvgDelta(vlKey, sollKey, elId) {
+  const el = document.getElementById(elId);
+  if (!el || state[vlKey] === undefined || state[sollKey] === undefined) return;
+  const d = state[vlKey] - state[sollKey];
+  el.textContent = (d >= 0 ? '+' : '') + d.toFixed(1) + '°';
+  el.setAttribute('fill', Math.abs(d) > 3 ? '#ff9800' : '#78909c');
+}
+
+function formatUptime(seconds) {
+  if (typeof seconds !== 'number') return seconds;
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+  if (h > 0) return h + 'h ' + m + 'm';
+  return m + 'm';
+}
+
+// ---- Auto-fill from localStorage ----
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    const h = localStorage.getItem('mr12-host');
+    const t = localStorage.getItem('mr12-token');
+    if (h) document.getElementById('cfg-host').value = h;
+    if (t) document.getElementById('cfg-token').value = t;
+  } catch(e) {}
+});
+
+// ---- Enter key in login ----
+document.querySelectorAll('.login-card input').forEach(el => {
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,680 @@
+substitutions:
+  device_name: schneid-mr12
+  friendly_name: Heating Schneid MR-12
+
+esphome:
+  name: '${device_name}'
+  friendly_name: '${friendly_name}'
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: NONE    # Prevent WiFi sleep from blocking UART/Modbus on single-core ESP32-C3
+  output_power: 20dB       # Max transmit power for better signal
+  ap:
+    ssid: "${friendly_name} Setup"
+    password: "esptimecast"
+
+captive_portal:
+
+web_server:
+  port: 80
+  auth:
+    username: !secret esphome_web_username
+    password: !secret esphome_web_password
+
+# RS485 via MAX485 module with DE/RE direction control
+# Wiring: ESP32-C3 GPIO4 → DI (TX), GPIO3 → RO (RX), GPIO2 → DE+RE
+#         RS485 D+ → Modul A, D- → Modul B
+uart:
+  id: modbus_uart
+  tx_pin: GPIO4
+  rx_pin: GPIO3
+  baud_rate: 19200    # Adjustable on MR-12: 1200–57600
+  stop_bits: 1
+  data_bits: 8
+  parity: NONE
+  flow_control_pin: GPIO2  # MAX485 DE+RE (verbunden/gebrückt)
+
+modbus:
+  id: modbus_bus
+  uart_id: modbus_uart
+  send_wait_time: 250ms  # Default value — time between Modbus frames
+
+modbus_controller:
+  - id: mr12
+    address: 0x01
+    modbus_id: modbus_bus
+    setup_priority: -10
+    update_interval: 60s
+    command_throttle: 1000ms  # Wait 1s between commands — MR-12 needs time between requests
+
+# ─── Register addressing ──────────────────────────────────────────────────────
+# Schneid registers are listed as 4xxxx (e.g. 40600).
+# ESPHome address = register number − 40000  →  40600 = address 600
+# Temperatures marked "x,x°C" are stored as integer × 10  →  multiply: 0.1
+# ─────────────────────────────────────────────────────────────────────────────
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Uptime"
+
+  # ── Primary / Secondary circuit temperatures ────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Außentemperatur"
+    id: outdoor_temp
+    register_type: holding
+    address: 600      # 40600 — T6 Außentemperatur
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "RL Primär (T7)"
+    id: return_primary
+    register_type: holding
+    address: 601      # 40601 — T7 Rücklauf Primär
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "VL Sekundär (T8)"
+    id: flow_secondary
+    register_type: holding
+    address: 602      # 40602 — T8 Vorlauf Sekundär
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Solltemperatur VL Sekundär"
+    id: setpoint_flow_secondary
+    register_type: holding
+    address: 604      # 40604
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Max. Rücklauftemperatur Primär"
+    id: max_return_primary
+    register_type: holding
+    address: 605      # 40605
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Übergabestation"
+    id: status_uebergabe
+    register_type: holding
+    address: 606      # 40606 — 0=AUS, 1=EIN, 3=RL-Begrenzung, 4=Handbetrieb
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # ── Heating circuit 0 ───────────────────────────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "VL Heizkreis 0"
+    id: flow_hk0
+    register_type: holding
+    address: 610      # 40610
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+      - filter_out: 3276.6   # 0x7FFE = sensor not connected
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Solltemperatur Heizkreis 0"
+    id: setpoint_hk0
+    register_type: holding
+    address: 611      # 40611
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+      - filter_out: 3276.6   # 0x7FFE = sensor not connected
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Heizkreis 0"
+    id: status_hk0
+    register_type: holding
+    address: 617      # 40617 — 9=Auto, 0=Pump OFF/Mixer stand, 1=Pump ON/Mixer stand
+    value_type: U_WORD  # 2=Pump ON/Mixer OPEN, 3=Pump ON/Mixer CLOSED, etc.
+    state_class: measurement
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Mischer Heizkreis 0"
+    id: mixer_hk0
+    register_type: holding
+    address: 618      # 40618 — 0=Stand, 1=Auf, 2=Zu
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # ── Heating circuit 1 ───────────────────────────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "VL Heizkreis 1"
+    id: flow_hk1
+    register_type: holding
+    address: 620      # 40620
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Solltemperatur Heizkreis 1"
+    id: setpoint_hk1
+    register_type: holding
+    address: 621      # 40621
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Heizkreis 1"
+    id: status_hk1
+    register_type: holding
+    address: 627      # 40627
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Mischer Heizkreis 1"
+    id: mixer_hk1
+    register_type: holding
+    address: 628      # 40628 — 0=Stand, 1=Auf, 2=Zu
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # ── Heating circuit 2 ───────────────────────────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "VL Heizkreis 2"
+    id: flow_hk2
+    register_type: holding
+    address: 630      # 40630
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Solltemperatur Heizkreis 2"
+    id: setpoint_hk2
+    register_type: holding
+    address: 631      # 40631
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # ── Buffer / Hot water storage ──────────────────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Speicher 1 oben (T9)"
+    id: buffer1_top
+    register_type: holding
+    address: 690      # 40690 — T9 Speicher 1 oben
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Solltemperatur VL Boiler 1"
+    id: setpoint_boiler1
+    register_type: holding
+    address: 692      # 40692
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Boilerkreis 1"
+    id: status_boiler1
+    register_type: holding
+    address: 693      # 40693 — 9=Auto, 0=Boiler pump OFF, 1=Boiler pump ON
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # ── Buffer / Hot water storage 2 ─────────────────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Speicher 2 oben"
+    id: buffer2_top
+    register_type: holding
+    address: 695      # 40695
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Speicher 2 unten"
+    id: buffer2_bottom
+    register_type: holding
+    address: 696      # 40696
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Solltemperatur VL Boiler 2"
+    id: setpoint_boiler2
+    register_type: holding
+    address: 697      # 40697
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Status Boilerkreis 2"
+    id: status_boiler2
+    register_type: holding
+    address: 698      # 40698
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # ── System registers ─────────────────────────────────────────────────────────
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Außentemperatur Mittel"
+    id: outdoor_temp_mean
+    register_type: holding
+    address: 728      # 40728
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Außentemperatur Mittel Langzeit"
+    id: outdoor_temp_mean_long
+    register_type: holding
+    address: 729      # 40729
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # ── Wärmemengenzähler (Kamstrup via M-Bus COM B) ────────────────────────────
+  # 32-bit unsigned long values span two consecutive registers (high word first)
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Wärmemenge"
+    id: waermemenge
+    register_type: holding
+    address: 730      # 40730-40731
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Volumen"
+    id: volumen
+    register_type: holding
+    address: 732      # 40732-40733
+    value_type: U_DWORD
+    unit_of_measurement: "l"
+    state_class: total_increasing
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Leistung"
+    id: leistung
+    register_type: holding
+    address: 734      # 40734-40735
+    value_type: U_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Durchfluss"
+    id: durchfluss
+    register_type: holding
+    address: 740      # 40740-40741
+    value_type: U_DWORD
+    unit_of_measurement: "l/h"
+    state_class: measurement
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "WMZ Vorlauftemperatur"
+    id: wmz_vorlauf
+    register_type: holding
+    address: 747      # 40747
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "WMZ Rücklauftemperatur"
+    id: wmz_ruecklauf
+    register_type: holding
+    address: 748      # 40748
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+binary_sensor:
+  # Pump registers: bit 0 = pump running (value 1 = ON, 0 = OFF)
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Pumpe Heizkreis 0"
+    id: pump_hk0
+    register_type: holding
+    address: 616      # 40616
+    bitmask: 0x01
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Pumpe Heizkreis 1"
+    id: pump_hk1
+    register_type: holding
+    address: 626      # 40626
+    bitmask: 0x01
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Pumpe Boiler 1"
+    id: pump_boiler1
+    register_type: holding
+    address: 694      # 40694
+    bitmask: 0x01
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Pumpe Boiler 2"
+    id: pump_boiler2
+    register_type: holding
+    address: 699      # 40699
+    bitmask: 0x01
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Zubringpumpe"
+    id: feed_pump
+    register_type: holding
+    address: 708      # 40708
+    bitmask: 0x01
+
+# ── Read/Write setpoints ──────────────────────────────────────────────────────
+# These allow adjusting operating mode and setpoints from Home Assistant.
+# Only uncomment/enable the circuits and parameters you actually have configured.
+
+number:
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Betriebsmodus Heizkreis 0"
+    id: mode_hk0
+    register_type: holding
+    address: 240      # 40240
+    value_type: U_WORD
+    min_value: 0
+    max_value: 5
+    step: 1
+    mode: box
+    # 0=AUS/Frostschutz, 1=Absenkbetrieb, 2=Heizbetrieb,
+    # 3=Zeitprogramm, 4=Partymodus, 5=Wahlschalter
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Betriebsmodus Heizkreis 1"
+    id: mode_hk1
+    register_type: holding
+    address: 241      # 40241
+    value_type: U_WORD
+    min_value: 0
+    max_value: 5
+    step: 1
+    mode: box
+
+  # ── Register scan helpers ─────────────────────────────────────────────────────
+  - platform: template
+    name: "Scan Address"
+    id: scan_address
+    min_value: 0
+    max_value: 9999
+    step: 1
+    initial_value: 600
+    optimistic: true
+    restore_value: true
+    entity_category: diagnostic
+    mode: box
+
+  - platform: template
+    name: "Scan Count"
+    id: scan_count
+    min_value: 1
+    max_value: 20
+    step: 1
+    initial_value: 10
+    optimistic: true
+    restore_value: true
+    entity_category: diagnostic
+    mode: box
+
+  - platform: modbus_controller
+    modbus_controller_id: mr12
+    name: "Boiler Solltemperatur"
+    id: boiler_setpoint
+    register_type: holding
+    address: 80       # 40080
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    min_value: 30
+    max_value: 65
+    step: 1
+    mode: box
+
+button:
+  - platform: template
+    name: "Scan All Registers"
+    id: scan_all_registers
+    entity_category: diagnostic
+    on_press:
+      - lambda: |-
+          using namespace esphome::modbus_controller;
+          ESP_LOGI("regscan", "========== FULL REGISTER SCAN ==========");
+
+          auto enqueue = [](ModbusController *ctrl, uint16_t start, uint16_t count) {
+            auto cmd = ModbusCommandItem::create_read_command(
+              ctrl, ModbusRegisterType::HOLDING, start, count,
+              [start, count](ModbusRegisterType rt, uint16_t addr,
+                             const std::vector<uint8_t> &data) {
+                ESP_LOGI("regscan", "--- Block 4%04d-4%04d ---", start, start + count - 1);
+                for (uint16_t i = 0; i < count && (i * 2 + 1) < data.size(); i++) {
+                  uint16_t uval = (data[i * 2] << 8) | data[i * 2 + 1];
+                  int16_t  sval = static_cast<int16_t>(uval);
+                  if (uval != 0x7FFF && uval != 0xFFFF) {
+                    ESP_LOGI("regscan", "  4%04d = %6d  (u:%5u  0x%04X)",
+                             start + i, sval, uval, uval);
+                  }
+                }
+              }
+            );
+            ctrl->queue_command(cmd);
+          };
+
+          auto scan_range = [&enqueue](ModbusController *ctrl, uint16_t from, uint16_t to) {
+            for (uint16_t s = from; s < to; s += 10) {
+              uint16_t n = (to - s < 10) ? (to - s) : 10;
+              enqueue(ctrl, s, n);
+            }
+          };
+
+          auto *ctrl = id(mr12);
+          // Config registers 40000-40099
+          scan_range(ctrl, 0, 100);
+          // Status registers 40600-40700
+          scan_range(ctrl, 600, 700);
+          // System + WMZ registers 40700-40767
+          scan_range(ctrl, 700, 767);
+
+  - platform: template
+    name: "Scan Register"
+    id: scan_single_register
+    entity_category: diagnostic
+    on_press:
+      - lambda: |-
+          using namespace esphome::modbus_controller;
+          uint16_t addr = static_cast<uint16_t>(id(scan_address).state);
+          auto *ctrl = id(mr12);
+          uint16_t count = static_cast<uint16_t>(id(scan_count).state);
+          if (count < 1) count = 1;
+          if (count > 20) count = 20;
+          ESP_LOGI("regscan", "Reading %d register(s) starting at 4%04d ...", count, addr);
+          auto cmd = ModbusCommandItem::create_read_command(
+            ctrl, ModbusRegisterType::HOLDING, addr, count,
+            [addr, count](ModbusRegisterType rt, uint16_t a,
+                          const std::vector<uint8_t> &data) {
+              for (uint16_t i = 0; i < count && (i * 2 + 1) < data.size(); i++) {
+                uint16_t uval = (data[i * 2] << 8) | data[i * 2 + 1];
+                int16_t  sval = static_cast<int16_t>(uval);
+                ESP_LOGI("regscan", "  4%04d = %6d  (u:%5u  0x%04X)",
+                         addr + i, sval, uval, uval);
+              }
+            }
+          );
+          ctrl->queue_command(cmd);
+
+switch:
+  - platform: restart
+    name: "Restart"
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+    entity_category: diagnostic

@@ -1,0 +1,66 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Fernwärme MR-12 – Custom Lovelace Card – Beispiel-Konfiguration
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# INSTALLATION
+# ────────────
+# 1. Datei kopieren:
+#      fernwaerme-mr12-card.js  →  <ha-config>/www/fernwaerme-mr12-card.js
+#
+# 2. Als Ressource registrieren:
+#      HA → Einstellungen → Dashboards → ⋮ (oben rechts) → Ressourcen
+#      → + Ressource hinzufügen
+#        URL:  /local/fernwaerme-mr12-card.js
+#        Typ:  JavaScript-Modul
+#
+# 3. HA neu laden (Entwicklerwerkzeuge → YAML neu laden) oder Browser-Cache leeren.
+#
+# 4. Karte zu einem Dashboard hinzufügen (Roher YAML-Editor):
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Minimale Konfiguration (alle Defaults)
+# ──────────────────────────────────────────────────────────────────────────────
+type: custom:fernwaerme-mr12-card
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Vollständige Konfiguration mit allen optionalen Parametern
+# ──────────────────────────────────────────────────────────────────────────────
+# type: custom:fernwaerme-mr12-card
+# title: Fernwärme Übergabestation   # Kartenüberschrift (optional)
+# entity_prefix: heating_schneid_mr_12  # Präfix der HA-Entities (optional)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Verwendete Entities (alle automatisch via entity_prefix)
+# ──────────────────────────────────────────────────────────────────────────────
+# sensor.heating_schneid_mr_12_aussentemperatur
+# sensor.heating_schneid_mr_12_aussentemperatur_mittel
+# sensor.heating_schneid_mr_12_rl_primar_t7
+# sensor.heating_schneid_mr_12_vl_sekundar_t8
+# sensor.heating_schneid_mr_12_solltemperatur_vl_sekundar
+# sensor.heating_schneid_mr_12_max_rucklauftemperatur_primar
+# sensor.heating_schneid_mr_12_status_ubergabestation
+# sensor.heating_schneid_mr_12_vl_heizkreis_1
+# sensor.heating_schneid_mr_12_solltemperatur_heizkreis_1
+# sensor.heating_schneid_mr_12_status_heizkreis_1
+# sensor.heating_schneid_mr_12_status_mischer_heizkreis_1
+# sensor.heating_schneid_mr_12_speicher_1_oben_t9
+# sensor.heating_schneid_mr_12_solltemperatur_vl_boiler_1
+# sensor.heating_schneid_mr_12_status_boilerkreis_1
+# sensor.heating_schneid_mr_12_leistung
+# sensor.heating_schneid_mr_12_durchfluss
+# sensor.heating_schneid_mr_12_warmemenge
+# sensor.heating_schneid_mr_12_wmz_vorlauftemperatur
+# sensor.heating_schneid_mr_12_wmz_rucklauftemperatur
+# binary_sensor.heating_schneid_mr_12_pumpe_heizkreis_1
+# binary_sensor.heating_schneid_mr_12_pumpe_boiler_1
+# binary_sensor.heating_schneid_mr_12_zubringpumpe
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Tipp: Dashboard-View mit ausschließlich dieser Karte
+# ──────────────────────────────────────────────────────────────────────────────
+# views:
+#   - title: Heizung
+#     path: heizung
+#     cards:
+#       - type: custom:fernwaerme-mr12-card
+#         title: Fernwärme Übergabestation
