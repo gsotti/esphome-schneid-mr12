@@ -160,57 +160,6 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
 
-  # ── Heating circuit 0 ───────────────────────────────────────────────────────
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "VL Heizkreis 0"
-    id: flow_hk0
-    register_type: holding
-    address: 610      # 40610
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    filters:
-      - multiply: 0.1
-      - filter_out: 3276.6   # 0x7FFE = sensor not connected
-
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "Solltemperatur Heizkreis 0"
-    id: setpoint_hk0
-    register_type: holding
-    address: 611      # 40611
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    filters:
-      - multiply: 0.1
-      - filter_out: 3276.6   # 0x7FFE = sensor not connected
-
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "Status Heizkreis 0"
-    id: status_hk0
-    register_type: holding
-    address: 617      # 40617 — 9=Auto, 0=Pump OFF/Mixer stand, 1=Pump ON/Mixer stand
-    value_type: U_WORD  # 2=Pump ON/Mixer OPEN, 3=Pump ON/Mixer CLOSED, etc.
-    state_class: measurement
-    accuracy_decimals: 0
-
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "Status Mischer Heizkreis 0"
-    id: mixer_hk0
-    register_type: holding
-    address: 618      # 40618 — 0=Stand, 1=Auf, 2=Zu
-    value_type: U_WORD
-    state_class: measurement
-    accuracy_decimals: 0
-
   # ── Heating circuit 1 ───────────────────────────────────────────────────────
   - platform: modbus_controller
     modbus_controller_id: mr12
@@ -259,35 +208,6 @@ sensor:
     value_type: U_WORD
     state_class: measurement
     accuracy_decimals: 0
-
-  # ── Heating circuit 2 ───────────────────────────────────────────────────────
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "VL Heizkreis 2"
-    id: flow_hk2
-    register_type: holding
-    address: 630      # 40630
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    filters:
-      - multiply: 0.1
-
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "Solltemperatur Heizkreis 2"
-    id: setpoint_hk2
-    register_type: holding
-    address: 631      # 40631
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    filters:
-      - multiply: 0.1
 
   # ── Buffer / Hot water storage ──────────────────────────────────────────────
   - platform: modbus_controller
@@ -492,14 +412,6 @@ binary_sensor:
   # Pump registers: bit 0 = pump running (value 1 = ON, 0 = OFF)
   - platform: modbus_controller
     modbus_controller_id: mr12
-    name: "Pumpe Heizkreis 0"
-    id: pump_hk0
-    register_type: holding
-    address: 616      # 40616
-    bitmask: 0x01
-
-  - platform: modbus_controller
-    modbus_controller_id: mr12
     name: "Pumpe Heizkreis 1"
     id: pump_hk1
     register_type: holding
@@ -535,20 +447,6 @@ binary_sensor:
 # Only uncomment/enable the circuits and parameters you actually have configured.
 
 number:
-  - platform: modbus_controller
-    modbus_controller_id: mr12
-    name: "Betriebsmodus Heizkreis 0"
-    id: mode_hk0
-    register_type: holding
-    address: 240      # 40240
-    value_type: U_WORD
-    min_value: 0
-    max_value: 5
-    step: 1
-    mode: box
-    # 0=AUS/Frostschutz, 1=Absenkbetrieb, 2=Heizbetrieb,
-    # 3=Zeitprogramm, 4=Partymodus, 5=Wahlschalter
-
   - platform: modbus_controller
     modbus_controller_id: mr12
     name: "Betriebsmodus Heizkreis 1"
