@@ -1,5 +1,5 @@
 /**
- * fernwaerme-mr12-card.js  —  Custom Home Assistant Lovelace Card
+ * schneid-mr12-card.js  —  Custom Home Assistant Lovelace Card
  * ================================================================
  *
  * Displays a live SVG system diagram of a Fernwärme (district heating)

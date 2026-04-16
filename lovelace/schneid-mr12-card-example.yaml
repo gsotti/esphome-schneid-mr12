@@ -5,7 +5,7 @@
 # INSTALLATION
 # ────────────
 # 1. Datei kopieren:
-#      fernwaerme-mr12-card.js  →  <ha-config>/www/fernwaerme-mr12-card.js
+#      schneid-mr12-card.js  →  <ha-config>/www/schneid-mr12-card.js
 #
 # 2. Als Ressource registrieren:
 #      HA → Einstellungen → Dashboards → ⋮ (oben rechts) → Ressourcen

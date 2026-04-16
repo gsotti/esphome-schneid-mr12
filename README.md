@@ -43,7 +43,7 @@ HA → Einstellungen → Dashboards → Ressourcen → `/local/schneid-mr12-card
 ### Karte einbinden
 
 ```yaml
-type: custom:fernwaerme-mr12-card
+type: custom:schneid-mr12-card
 title: Fernwärme Übergabestation       # optional
 entity_prefix: heating_schneid_mr_12   # optional (Default)
 ```
