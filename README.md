@@ -32,6 +32,8 @@ Visualisiert die Übergabestation in Echtzeit als SVG-Systemdiagramm:
 2. URL: `https://github.com/<dein-user>/schneid-mr12` · Kategorie: **Lovelace**
 3. Karte installieren & HA neu laden
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Stefan+Gsottbauer&repository=https%3A%2F%2Fgithub.com%2Fgsotti%2Fesphome-schneid-mr12&category=Dashboard)
+
 ### Manuelle Installation
 
 ```bash

@@ -390,9 +390,9 @@ sensor:
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
-    accuracy_decimals: 1
+    accuracy_decimals: 2
     filters:
-      - multiply: 0.1
+      - multiply: 0.01  # Kamstrup stores °C × 100
 
   - platform: modbus_controller
     modbus_controller_id: mr12
@@ -404,9 +404,9 @@ sensor:
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
-    accuracy_decimals: 1
+    accuracy_decimals: 2
     filters:
-      - multiply: 0.1
+      - multiply: 0.01  # Kamstrup stores °C × 100
 
 binary_sensor:
   # Pump registers: bit 0 = pump running (value 1 = ON, 0 = OFF)
