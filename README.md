@@ -56,6 +56,8 @@ entity_prefix: heating_schneid_mr_12   # optional (Default)
 
 **Hardware:** ESP32-C3 + MAX485-Modul → RS485 → Schneid MR-12 (Modbus RTU, 19200 Bd)
 
+![Wiring Diagram](docs/wiring-diagram.svg)
+
 ```yaml
 # secrets.yaml benötigt:
 api_encryption_key: "..."
@@ -68,9 +70,11 @@ Alle ausgelesenen Register sind in [`esphome/schneid-mr12.yaml`](esphome/schneid
 
 ---
 
-## PCB
+---
 
-KiCad-Projekt für eine kompakte RS485-Adapterplatine (ESP32-C3 → MAX485 → MR-12 Klemmleiste).
+## Referenzen
+
+- [Schneid MR-12 R24 Modbus RTU – Registerliste alle Kreise (PDF)](https://forum.iobroker.net/assets/uploads/files/1693123274500-mr-12-r24-modbus-rtu-alle-kreise.pdf)
 
 ---
 
